@@ -7,13 +7,19 @@ function sendProxyRequest(Container) {
   var bodyContent = Container.proxy.bodyContent;
   var reqOpt = Container.proxy.reqBuilder;
   var options = Container.options;
+  var debug = options.debug;
 
   return new Promise(function(resolve, reject) {
     var protocol = Container.proxy.requestModule;
     var proxyReq = protocol.request(reqOpt, function(rsp) {
       var chunks = [];
-      rsp.on('data', function(chunk) { chunks.push(chunk); });
+      rsp.on('data', function(chunk) {
+        if (debug) { debug('data', rsp, chunk); }
+        chunks.push(chunk);
+      });
+
       rsp.on('end', function() {
+        if (debug) { debug('end', rsp); }
         Container.proxy.res = rsp;
         Container.proxy.resData = Buffer.concat(chunks, chunkLength(chunks));
         resolve(Container);
@@ -26,6 +32,19 @@ function sendProxyRequest(Container) {
     var timeoutDuration = null;
 
     proxyReq.on('socket', function(socket) {
+      if (debug) {
+        debug('socket', socket);
+
+        socket.on('lookup', function(err, address, family, host) {
+          debug('lookup', socket, err, address, family, host);
+        });
+        socket.on('connect', function() { debug('connect', socket); });
+        socket.on('session', function(session) { debug('session', socket, session); });
+        socket.on('secureConnect', function() { debug('secureConnect', socket); });
+        socket.on('ready', function() { debug('ready', socket); });
+        socket.on('close', function(hadError) { debug('close', socket, hadError); });
+      }
+
       var isSecure = Container.proxy.isSecure;
       var timeout = options.timeout;
       var connectTimeout = options.connectTimeout;
